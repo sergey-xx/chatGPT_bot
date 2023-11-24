@@ -1,0 +1,13 @@
+
+version: '3'
+
+volumes:
+  logs_volume:
+
+services:
+  backend:
+    image: sergeyxx/gpt_bot
+    env_file: .env
+    restart: always
+    volumes:
+      - logs_volume:/logs/

@@ -1,3 +1,9 @@
+"""Модуль, принимающие сообщения от пользователей в Телеграм.
+
+И отправляющий ответ, полученный от chatGPT.
+https://github.com/sergey-xx
+"""
+
 import os
 import logging
 
@@ -6,7 +12,6 @@ from dotenv import load_dotenv
 from telegram.ext import Updater, Filters, MessageHandler, CommandHandler
 from telegram import ReplyKeyboardMarkup
 
-
 from exceptions import APIAccessError, SendMessageError, DictError
 
 
@@ -14,6 +19,7 @@ load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TOKEN")
+
 openai.api_key = OPENAI_API_KEY
 
 logging.basicConfig(
@@ -37,31 +43,34 @@ def check_tokens():
 
 
 def wake_up(update, context):
+    """Функция реакции на кнопку. Пока не имеет особого смысла."""
     chat = update.effective_chat
     name = update.message.chat.first_name
     button = ReplyKeyboardMarkup([['/start']], resize_keyboard=True)
     hi_text = f'Спасибо, что вы включили меня, {format(name)}!'
     if os.getenv("DEBUG"):
         hi_text = 'Ведутся технические работы.'
-    # Добавим кнопку в содержимое отправляемого сообщения
     context.bot.send_message(
         chat_id=chat.id,
         text=hi_text,
         reply_markup=button)
 
 
-messages = list()
+# тут хранится история. Для каждого чата история своя.
+messages = dict()
 
 
-def get_gpt_answer(question):
-    messages.append({"role": "user", "content": question})
+def get_gpt_answer(chat_id):
+    """Функция, запрашивающая ответ у ChatGPT."""
+    message = messages[chat_id]
     try:
         chat_completion = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=messages
+            messages=message
             )
-    except:
-        raise APIAccessError('Ошибка доступа к API')
+    except APIAccessError as error:
+        logger.error(error)
+
     answer = chat_completion.get(
         'choices')[0].get(
         'message').get(
@@ -69,18 +78,24 @@ def get_gpt_answer(question):
     if not answer:
         raise DictError('Пришел ответ неизвестного формата')
 
-    print(answer)
-    messages.pop()
-    messages.append({"role": "assistant", "content": answer})
-    if len(messages) >= 5:
-        messages.pop(0)
     return answer
 
 
 def say_answer(update, context):
+    """Основная функция, следящая за новыми сообщениями и посылающая ответ."""
     chat = update.effective_chat
-    print(update.message.text)
-    answer = get_gpt_answer(update.message.text)
+    if chat.id not in messages:
+        messages[chat.id] = [{"role": "user",
+                              "content": update.message.text}, ]
+    else:
+        messages[chat.id].append({"role": "user",
+                                  "content": update.message.text})
+    answer = get_gpt_answer(chat.id)
+    messages[chat.id].pop()
+    messages[chat.id].append({"role": "assistant", "content": answer})
+    if len(messages[chat.id]) >= 5:
+        messages[chat.id].pop(0)
+
     try:
         context.bot.send_message(chat_id=chat.id, text=answer)
         logger.debug('Бот отправил сообщение.')
@@ -89,6 +104,7 @@ def say_answer(update, context):
 
 
 def main():
+    """Функция main."""
     if not check_tokens():
         exit()
     updater = Updater(token=TELEGRAM_TOKEN)
