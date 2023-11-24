@@ -4,16 +4,15 @@
 https://github.com/sergey-xx
 """
 
-import os
 import logging
+import os
 
 import openai
 from dotenv import load_dotenv
-from telegram.ext import Updater, Filters, MessageHandler, CommandHandler
 from telegram import ReplyKeyboardMarkup
+from telegram.ext import CommandHandler, Filters, MessageHandler, Updater
 
-from exceptions import APIAccessError, SendMessageError, DictError
-
+from exceptions import APIAccessError, DictError, SendMessageError
 
 load_dotenv()
 
