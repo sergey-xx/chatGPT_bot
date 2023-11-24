@@ -3,7 +3,7 @@ name: Main ChatGPT_bot workflow
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   tests:
