@@ -20,6 +20,7 @@ load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TOKEN")
+MAX_FILE_DESCR_LEN = 20
 
 openai.api_key = OPENAI_API_KEY
 
@@ -113,8 +114,13 @@ def get_gpt_image(chat_id):
     image_url = response.data[0].url
     image = requests.get(image_url, allow_redirects=True, timeout=20).content
     time_now = int(time.monotonic())
+
+    if len(image_description) > MAX_FILE_DESCR_LEN:
+        image_description = image_description[:MAX_FILE_DESCR_LEN]
+
     filename = (os.getenv("IMG_FOLDER", "") +
                 f'image_{image_description}_{time_now}.png')
+
     with open(filename, 'wb') as f:
         f.write(image)
     return image
