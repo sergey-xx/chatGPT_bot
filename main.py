@@ -21,6 +21,7 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TOKEN")
 MAX_FILE_DESCR_LEN = 20
+ERROR_RESPONSE = 'content_policy_violation'
 
 openai.api_key = OPENAI_API_KEY
 
@@ -109,8 +110,11 @@ def get_gpt_image(chat_id):
             size="1024x1024",
             quality="standard",
             n=1,)
-    except APIAccessError as error:
+    except openai.OpenAIError as error:
         logger.error(error)
+        if error.code == ERROR_RESPONSE:
+            return error.code
+
     image_url = response.data[0].url
     image = requests.get(image_url, allow_redirects=True, timeout=20).content
     time_now = int(time.monotonic())
@@ -150,17 +154,24 @@ def get_gpt_answer(chat_id):
 def say_answer(update, context):
     """Основная функция, следящая за новыми сообщениями и посылающая ответ."""
     chat = update.effective_chat
+    button = ReplyKeyboardMarkup([['/ask_picture']],
+                                 resize_keyboard=True)
+
     if chat.id not in messages:
         messages[chat.id] = [{"role": "user",
                               "content": update.message.text}, ]
     else:
         messages[chat.id].append({"role": "user",
                                   "content": update.message.text})
-    button = ReplyKeyboardMarkup([['/ask_picture']],
-                                 resize_keyboard=True)
     if is_image_requested.get(chat.id):
         image = get_gpt_image(chat.id)
         is_image_requested.pop(chat.id)
+        if image == ERROR_RESPONSE:
+            context.bot.send_message(chat_id=chat.id,
+                                     text=('текст вашего запроса был отклонен '
+                                           'сервером по этическим соображениям'
+                                           ),
+                                     reply_markup=button)
         try:
             context.bot.send_photo(chat.id,
                                    image,
@@ -191,12 +202,15 @@ if __name__ == '__main__':
     updater.dispatcher.add_handler(CommandHandler('start',
                                                   wake_up,
                                                   run_async=True))
+
     updater.dispatcher.add_handler(CommandHandler('ask_picture',
                                                   ask_picture,
                                                   run_async=True))
+
     updater.dispatcher.add_handler(CommandHandler('ask_question',
                                                   ask_question,
                                                   run_async=True))
+                                                  
     updater.dispatcher.add_handler(MessageHandler(Filters.text,
                                                   say_answer,
                                                   run_async=True))
