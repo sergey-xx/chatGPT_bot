@@ -210,7 +210,7 @@ if __name__ == '__main__':
     updater.dispatcher.add_handler(CommandHandler('ask_question',
                                                   ask_question,
                                                   run_async=True))
-                                                  
+
     updater.dispatcher.add_handler(MessageHandler(Filters.text,
                                                   say_answer,
                                                   run_async=True))
